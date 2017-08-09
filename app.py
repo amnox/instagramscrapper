@@ -8,10 +8,19 @@ from selenium.webdriver.common.action_chains import ActionChains
 import requests, re, json ,pprint
 from bs4 import BeautifulSoup
 import pandas as pd
-from flask import Flask,render_template,request
+from flask import Flask,render_template,request,make_response
 from .InstaForm import InstaForm
+import re
 app = Flask(__name__)
 
+def get_emails(s):
+    regex = re.compile(("([a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`"
+                    "{|}~-]+)*(@|\sat\s)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(\.|"
+                    "\sdot\s))+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)"))
+    """Returns an iterator of matched emails found in string s."""
+    # Removing lines that start with '//' because the regular expression
+    # mistakenly matches patterns like 'http://foo@bar.com' as '//foo@bar.com'.
+    return (email[0] for email in re.findall(regex, s) if not email[0].startswith('//'))
 
 def lord_giveth_formatting(text):
     if text.find("k")<0:
@@ -30,18 +39,23 @@ def get_profile_data(profiles,tag):
         json_text = re.search(r'^\s*window\._sharedData\s*=\s*({.*?})\s*;\s*$',script.string, flags=re.DOTALL | re.MULTILINE).group(1)
         data = json.loads(json_text)
         #print json.dumps(data, indent=4, sort_keys=True)
-        bio = data["entry_data"]["ProfilePage"][0]["user"]["biography"]
+        insta_id = data["entry_data"]["ProfilePage"][0]["user"]["id"]
+        username = data["entry_data"]["ProfilePage"][0]["user"]["username"]
+        emails = get_emails(data["entry_data"]["ProfilePage"][0]["user"]["biography"])
+        email=''
         usr_url = data["entry_data"]["ProfilePage"][0]["user"]["external_url"]
+        bio = data["entry_data"]["ProfilePage"][0]["user"]["biography"]
         followers = data["entry_data"]["ProfilePage"][0]["user"]["followed_by"]["count"]
         following = data["entry_data"]["ProfilePage"][0]["user"]["follows"]["count"]
         full_name = data["entry_data"]["ProfilePage"][0]["user"]["full_name"]
-        insta_id = data["entry_data"]["ProfilePage"][0]["user"]["id"]
         media_count = data["entry_data"]["ProfilePage"][0]["user"]["media"]["count"]
-        username = data["entry_data"]["ProfilePage"][0]["user"]["username"]
         profile_pic = data["entry_data"]["ProfilePage"][0]["user"]["profile_pic_url_hd"]
-        profile_dict.append({'insta_id':insta_id, 'username':username, 'profile_url': usr_url, 
-                             'full_name':full_name, 
-                            'bio':bio, 'followers':followers,'following':following, 'media_count':media_count,'hash_tag':tag})
+        for ema in emails:
+            email=ema.decode("utf-8", "strict")
+            print type(email+" ")
+            print email
+            break
+        profile_dict.append({'insta_id':insta_id, 'username':username, 'profile_url': usr_url, 'full_name':full_name, 'bio':bio, 'followers':followers,'following':following, 'media_count':media_count, 'tag':tag,'email':email})
     #pd.DataFrame(profile_dict).to_csv(tag,encoding = "utf-8")
     return profile_dict
 
@@ -95,4 +109,10 @@ def hello_buck():
         booga.extend(get_profile_data(list(set(profiles)),shit))
 
     driver.close()
-    return pd.DataFrame(booga).to_csv(encoding = "utf-8")
+    csv = pd.DataFrame(booga).to_csv(encoding = "utf-8")
+    response = make_response(csv)
+    cd = 'attachment; filename=mycsv.csv'
+    response.headers['Content-Disposition'] = cd 
+    response.mimetype='text/csv'
+
+    return response
