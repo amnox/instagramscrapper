@@ -1,0 +1,13 @@
+<html>
+
+{% block content %}
+  <h1>Sign In</h1>
+  <form action="/results" method="post" name="login">
+      <p>Which Hashtag?:{{ form.name }}</p>
+      <p>how many Posts per Hashtag {{ form.depth }}</p>
+      <p>Min likes {{ form.min_likes }}</p>
+      <p><input type="submit" value="Sign In"></p>
+  </form>
+{% endblock %}
+
+</html>
